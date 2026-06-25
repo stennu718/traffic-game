@@ -29,6 +29,20 @@ button.active { background: #e94560; }
 #score-display { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: 8px; font-size: 0.9em; }
 #level-display { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: 8px; font-size: 0.9em; }
 .hint { font-size: 0.75em; color: #888; margin-top: 4px; font-style: italic; }
+.parking-lot { display: grid; gap: 4px; margin-top: 8px; }
+.parking-row { display: flex; gap: 4px; justify-content: center; }
+.parking-spot { width: 36px; height: 48px; border: 2px dashed #555; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.2em; cursor: pointer; transition: all 0.2s; position: relative; }
+.parking-spot:hover { border-color: #e94560; background: rgba(233,69,96,0.1); }
+.parking-spot.occupied { border-style: solid; border-color: #e94560; background: rgba(233,69,96,0.2); }
+.parking-spot.target { border-color: #2ecc71; animation: glow 1s infinite alternate; }
+.parking-spot.wrong { border-color: #c0392b; background: rgba(192,57,43,0.3); }
+@keyframes glow { from { box-shadow: 0 0 5px #2ecc71; } to { box-shadow: 0 0 15px #2ecc71; } }
+.text-task { background: #0f3460; padding: 12px; border-radius: 8px; margin-top: 8px; }
+.text-task h3 { font-size: 0.9em; color: #e94560; margin-bottom: 8px; }
+.text-task p { font-size: 0.82em; line-height: 1.5; margin-bottom: 8px; }
+.text-task input { width: 100%; padding: 8px; border: 1px solid #0f3460; border-radius: 4px; background: #16213e; color: #eee; font-size: 0.85em; margin-bottom: 8px; }
+.text-task .result { font-size: 0.8em; padding: 6px; border-radius: 4px; margin-top: 4px; }
+.calc-box { background: #16213e; padding: 8px; border-radius: 4px; margin-top: 6px; font-size: 0.78em; color: #aaa; }
 </style>
 </head>
 <body>
@@ -44,9 +58,12 @@ button.active { background: #e94560; }
 </div>
 <div><h2>🎮 Tegevused</h2>
 <button onclick="setMode('foor')">🚦 Fooride juhtimine</button>
+<button onclick="setMode('parkla')">🅿️ Parkla</button>
+<button onclick="setMode('parkimine')">🅿️ Parkimine</button>
 <button onclick="setMode('kiirus')">🏁 Kiiruse arvutamine</button>
 <button onclick="setMode('prioriteet')">🚑 Prioriteedid</button>
 <button onclick="setMode('reaktsioon')">⚡ Reaktsioonid</button>
+<button onclick="setMode('ylesanded')">📝 Tekstülesanded</button>
 <button onclick="setMode('quiz')">❓ Kvissiülesanne</button>
 </div>
 <div id="quiz-area"></div>
@@ -264,7 +281,12 @@ const quizQuestions = [
     { q: 'Kas foori punane + kollane tähendab?', options: ['Mine kohe', 'Valmistu sõitma', 'Seisa', 'Pööra paremale'], a: 1, hint: 'Punane+kollane = valmistumine, mitte sõitmine.' },
     { q: 'Kui palju vähendab kiirus 80→50 km/h CO2?', options: ['~10%', '~25%', '~40%', '~50%'], a: 2, hint: 'Madalam kiirus = tõhusam kütuse kasutus.' },
     { q: 'Kumb foori värv tähendab "seisa"?', options: ['Kollane', 'Punane', 'Roheline', 'Vikervalgus'], a: 1, hint: 'Punane = stop igal juhul.' },
-    { q: 'Õnnetuste % "inimlik viga" põhjustel?', options: ['~30%', '~50%', '~70%', '~90%'], a: 3, hint: 'Enamik on tingitud tähelepanu häirumisest või kiirusest.' }
+    { q: 'Õnnetuste % "inimlik viga" põhjustel?', options: ['~30%', '~50%', '~70%', '~90%'], a: 3, hint: 'Enamik on tingitud tähelepanu häirumisest või kiirusest.' },
+    { q: 'Kui kaugel tuleb hoida sõidukaugus 50 km/h juures?', options: ['10m', '15m', '25m', '50m'], a: 2, hint: 'Reegel: (kiirus/10) * 3 = 15m. Aga 50km/h juures soovitatakse ~25m.' },
+    { q: 'Kumb on Eestis tavaline kiiruspiirang linnas?', options: ['30 km/h', '40 km/h', '50 km/h', '60 km/h'], a: 2, hint: 'Eestis on tavaline linnapiirang 50 km/h.' },
+    { q: 'Kui palju nähtavust peab olema talvel sõiduks?', options: ['50m', '100m', '200m', '500m'], a: 2, hint: 'Vähemalt 200m nähtavust on vajalik ohutuks sõiduks.' },
+    { q: 'Kas tohib parkida kõnnitee 50m raadiuses?', options: ['Jah', 'Ainult öösel', 'Ei', 'Ainult kuni 1h'], a: 2, hint: 'Kõnnitee lähedusel on parkimine keelatud 50m raadiuses.' },
+    { q: 'Kui kaua võib auto seisma peatumiskohas?', options: ['5 min', '15 min', 'Maksimaalselt 5 min või kuni takistus eemaldatud', 'Piultult'], a: 2, hint: 'Peatuskohas võib seista võrdselt 5 min või kuni takistus eemaldatud.' }
 ];
 
 function showQuiz() {
@@ -296,6 +318,43 @@ function startReactionTest() {
     reactionActive = true;
     reactionStart = performance.now();
     document.getElementById('hint-text').textContent = '⏵ Oota rohelist foori ja klõpsa!';
+}
+
+// Keyboard controls for parking sim
+const keys = {};
+document.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
+    if (mode === 'parkimine') {
+        if (e.key === 'q') parkingSim.car.angle -= 0.05;
+        if (e.key === 'e') parkingSim.car.angle += 0.05;
+    }
+});
+document.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+// Update parking sim from keys
+function updateParkingSim(dt) {
+    if (mode !== 'parkimine') return;
+    const speed = 80 * dt;
+    if (keys['ArrowUp']) {
+        parkingSim.car.x += Math.cos(parkingSim.car.angle) * speed;
+        parkingSim.car.y += Math.sin(parkingSim.car.angle) * speed;
+    }
+    if (keys['ArrowDown']) {
+        parkingSim.car.x -= Math.cos(parkingSim.car.angle) * speed * 0.5;
+        parkingSim.car.y -= Math.sin(parkingSim.car.angle) * speed * 0.5;
+    }
+    if (keys['ArrowLeft']) parkingSim.car.angle -= 2 * dt;
+    if (keys['ArrowRight']) parkingSim.car.angle += 2 * dt;
+    
+    // Check if in target zone
+    const dx = parkingSim.car.x - parkingSim.target.x;
+    const dy = parkingSim.car.y - parkingSim.target.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < 30 && Math.abs(parkingSim.car.angle - parkingSim.target.angle) < 0.3) {
+        score += 100;
+        showBanner('✅ Parkitud! +100 punkti');
+        initParkingSim();
+    }
 }
 
 canvas.addEventListener('click', (e) => {
@@ -338,15 +397,313 @@ canvas.addEventListener('click', (e) => {
     }
 });
 
+// === PARKLA ===
+let parkingLot = { spots: [], rows: 4, cols: 6, targetSpot: -1, occupiedCount: 0 };
+
+function initParkingLot() {
+    parkingLot.spots = [];
+    parkingLot.occupiedCount = 0;
+    for (let r = 0; r < parkingLot.rows; r++) {
+        for (let c = 0; c < parkingLot.cols; c++) {
+            const occupied = Math.random() < 0.4;
+            if (occupied) parkingLot.occupiedCount++;
+            parkingLot.spots.push({ row: r, col: c, occupied, id: r * parkingLot.cols + c });
+        }
+    }
+    // Pick a free target spot
+    const freeSpots = parkingLot.spots.filter(s => !s.occupied);
+    parkingLot.targetSpot = freeSpots.length > 0 ? freeSpots[Math.floor(Math.random() * freeSpots.length)].id : -1;
+}
+
+function drawParkingLot() {
+    const area = document.getElementById('quiz-area');
+    let html = '<div style="margin-top:8px"><div style="text-align:center;font-size:0.85em;margin-bottom:8px">🅿️ <b>Parkla</b> — vabu: ' + parkingLot.spots.filter(s=>!s.occupied).length + '/' + parkingLot.spots.length + '</div>';
+    html += '<div style="background:#333;padding:8px;border-radius:8px;margin-bottom:8px">';
+    for (let r = 0; r < parkingLot.rows; r++) {
+        html += '<div class="parking-row">';
+        for (let c = 0; c < parkingLot.cols; c++) {
+            const spot = parkingLot.spots[r * parkingLot.cols + c];
+            let cls = 'parking-spot';
+            if (spot.occupied) cls += ' occupied';
+            if (spot.id === parkingLot.targetSpot) cls += ' target';
+            const icon = spot.occupied ? '🚗' : (spot.id === parkingLot.targetSpot ? '⭐' : '');
+            html += `<div class="${cls}" onclick="clickParkingSpot(${spot.id})">${icon}</div>`;
+        }
+        html += '</div>';
+        if (r === 1) html += '<div style="height:8px"></div>'; // aisle
+    }
+    html += '</div><div class="hint" id="parking-hint">Klõpsa tähistatud ⭐ kohale, et parkida</div></div>';
+    area.innerHTML = html;
+}
+
+function clickParkingSpot(id) {
+    const spot = parkingLot.spots[id];
+    const hint = document.getElementById('parking-hint');
+    if (spot.id === parkingLot.targetSpot) {
+        hint.innerHTML = '✅ Tubli! Õige koht! +50 punkti';
+        hint.style.color = '#2ecc71';
+        score += 50;
+        spot.occupied = true;
+        setTimeout(() => { initParkingLot(); drawParkingLot(); }, 1500);
+    } else if (spot.occupied) {
+        hint.innerHTML = '❌ See koht on juba hõivatud!';
+        hint.style.color = '#c0392b';
+    } else {
+        hint.innerHTML = '⚠️ Vaba koht, aga vale. Proovi uuesti!';
+        hint.style.color = '#f39c12';
+    }
+    updateUI();
+}
+
+// === PARKIMINE (simulaator) ===
+let parkingSim = { car: { x: 0, y: 0, angle: 0 }, target: { x: 0, y: 0, angle: 0 }, phase: 'move' };
+
+function initParkingSim() {
+    parkingSim.car = { x: 100, y: 300, angle: 0 };
+    parkingSim.target = { x: 300 + Math.random() * 200, y: 150, angle: 0 };
+    parkingSim.phase = 'move';
+}
+
+function drawParkingSim() {
+    ctx.fillStyle = '#2d5a27';
+    ctx.fillRect(0, 0, W, H);
+    
+    // Parking lot background
+    ctx.fillStyle = '#555';
+    ctx.fillRect(50, 80, W - 100, 200);
+    
+    // Parking spots
+    for (let i = 0; i < 8; i++) {
+        const sx = 80 + i * ((W - 160) / 8);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(sx, 100, (W - 160) / 8 - 5, 80);
+        // Some occupied
+        if (i !== 3 && i !== 5) {
+            ctx.fillStyle = `hsl(${i * 45}, 60%, 50%)`;
+            ctx.fillRect(sx + 5, 108, (W - 160) / 8 - 15, 64);
+        }
+    }
+    
+    // Target spot highlight
+    ctx.strokeStyle = '#2ecc71';
+    ctx.lineWidth = 3;
+    const tx = 80 + 5 * ((W - 160) / 8);
+    ctx.strokeRect(tx, 100, (W - 160) / 8 - 5, 80);
+    
+    // Draw car
+    ctx.save();
+    ctx.translate(parkingSim.car.x, parkingSim.car.y);
+    ctx.rotate(parkingSim.car.angle);
+    ctx.fillStyle = '#e94560';
+    ctx.fillRect(-20, -12, 40, 24);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(10, -10, 8, 20); // windshield
+    ctx.restore();
+    
+    // Instructions
+    ctx.fillStyle = '#fff';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Kasuta nooleklahve ← → ↑ ja Q/E pööramiseks. Parki rohelisse kasti!', W / 2, H - 40);
+    ctx.fillText('Faas: ' + (parkingSim.phase === 'move' ? 'Liigu sihtkohta' : 'Pööra ja parki'), W / 2, H - 20);
+}
+
+// === TEKSTÜLESANDED ===
+const textTasks = [
+    {
+        title: '🅿️ Parkimistasu arvutamine',
+        text: 'Parkimistasu Tallinnas kesklinnas on 2€ esimese tunni kohta ja 1€ iga järgne tunni kohta. Kui sa parkid 3.5 tunniks, kui palju maksad?',
+        answer: 5,
+        tolerance: 0,
+        hint: '1h = 2€, 2h = 2+1=3€, 3h = 3+1=4€, 3.5h = 4+1=5€ (ümardatakse üles)',
+        calc: '2€ (1. tund) + 1€ (2. tund) + 1€ (3. tund) + 1€ (pool tundi ümardatud) = 5€'
+    },
+    {
+        title: '⛽ Kütusekulu',
+        text: 'Auto kütusekulus on 6.5L/100km. Kütuse hind on 1.65€/L. Kui palju maksab 350km sõit?',
+        answer: 37.59,
+        tolerance: 0.1,
+        hint: 'Kulu = (kulus * km / 100) * hind',
+        calc: '(6.5 * 350 / 100) * 1.65 = 22.75L * 1.65€ = 37.54€'
+    },
+    {
+        title: '🅿️ Parkla täituvus',
+        text: 'Parklas on 120 kohta. Hommikul on 75% kohtadest hõivatud. Õhtul lisandub 30 auto. Mitu vaba kohta on õhtul?',
+        answer: 0,
+        tolerance: 0,
+        hint: '75% on 90 autot. 120-90=30 vaba. Lisandub 30 → 0 vaba.',
+        calc: '120 * 0.75 = 90 hõivatud. 120-90=30 vaba. 30-30=0 vaba õhtul.'
+    },
+    {
+        title: '🚗 Kiirus ja aeg',
+        text: 'Sõidad 120km/h kiirusel 180km. Kui kiirendad 20km/h võrra, kui palju aega säästad (minutites)?',
+        answer: 15,
+        tolerance: 1,
+        hint: 'Aeg = dist / kiirus. Eralda mõlemad ajad.',
+        calc: '180/120 = 1.5h = 90min. 180/140 = 1.286h = 77.1min. 90-77.1 ≈ 13min.'
+    },
+    {
+        title: '🅿️ Parkimise parkimismaks',
+        text: 'Parkimine kestis 2h 45min. Esimene 30 min on tasuta, seejärel 1.5€/h (ümardatakse täisjagu). Kui palju maksad?',
+        answer: 3,
+        tolerance: 0,
+        hint: '30min tasuta. 2h 15min = 2.25h → 3h ümardatud. 3 * 1.5€ = 4.5€ → 3 * 1.5 = 4.5',
+        calc: '2h45m - 30m = 2h15m. Ümardatud: 3h. 3 * 1.5€ = 4.5€'
+    },
+    {
+        title: '🛞 Rehvi rõhk',
+        text: 'Rehvi ideaalrõhk on 2.3 bar. Talvel peab olema +0.2 bar kõrgem. Kui rõhk on 1.9 bar, kui palju juurde pumpida (bar)?',
+        answer: 0.6,
+        tolerance: 0.05,
+        hint: 'Talve rõhk = 2.3 + 0.2 = 2.5 bar. Vahe = 2.5 - 1.9',
+        calc: 'Talve rõhk: 2.3 + 0.2 = 2.5 bar. Juurde: 2.5 - 1.9 = 0.6 bar'
+    },
+    {
+        title: '🚦 Foori ooteaeg',
+        text: 'Foori tsükkel on 60s (punane 30s, kollane 3s, roheline 27s). Kui saabud juhusliku hetke, mis tõenäosus oodata punast?',
+        answer: 50,
+        tolerance: 2,
+        hint: 'Tõenäosus = punase aeg / tsükkel * 100%',
+        calc: '30 / 60 * 100 = 50%'
+    },
+    {
+        title: '🅿️ Ruumiparkimine',
+        text: 'Auto pikkus on 4.5m, laius 1.8m. Parkimiskoht peab olema 0.5m pikem ja 0.3m laiem. Mis on parkimiskoha pindala?',
+        answer: 10.5,
+        tolerance: 0.1,
+        hint: 'Pikkus = 4.5 + 0.5 = 5m. Laius = 1.8 + 0.3 = 2.1m. Pindala = 5 * 2.1',
+        calc: '(4.5+0.5) * (1.8+0.3) = 5.0 * 2.1 = 10.5 m²'
+    },
+    {
+        title: '⛽ Elektriauto laadimine',
+        text: 'Elektriauto aku on 75 kWh. Laadija võimsus on 11 kW. Kui kaua laadib tühjast täis (tundides)?',
+        answer: 6.82,
+        tolerance: 0.1,
+        hint: 'Aeg = energia / võimsus',
+        calc: '75 kWh / 11 kW = 6.82h'
+    },
+    {
+        title: '🚗 Sõidukulu km kohta',
+        text: 'Auto kütusekulus on 7L/100km, kütuse hind 1.70€/L. Lisaks kulum 0.05€/km. Kogu kulutused 500km kohta?',
+        answer: 85,
+        tolerance: 1,
+        hint: 'Kütusekulud + kulum',
+        calc: '(7 * 1.70 * 500/100) + (0.05 * 500) = 59.5 + 25 = 84.5€'
+    },
+    {
+        title: '🅿️ Parkimisautomaat',
+        text: 'Parkimisautomaat võtab 0.5€/15min. Sul on 3€ mündis. Kui kaua saad maksimaalselt parkida (minutites)?',
+        answer: 90,
+        tolerance: 0,
+        hint: '3€ / 0.5€ = 6 perioodi. 6 * 15min = 90min.',
+        calc: '3€ / 0.5€ = 6 × 15min = 90 minutit'
+    },
+    {
+        title: '🚗 Sõidukaugus',
+        text: 'Sõidad 90 km/h. Reageerimisaeg on 1.5s. Kui kaugel oled 1.5s pärast (meetrites)?',
+        answer: 37.5,
+        tolerance: 1,
+        hint: 'Teepikkus = kiirus * aeg. 90 km/h = 25 m/s. 25 * 1.5 = 37.5m',
+        calc: '90 km/h = 25 m/s. 25 * 1.5s = 37.5m'
+    },
+    {
+        title: '🅿️ Parkla tulu',
+        text: 'Parklas on 80 kohta. Täitumine on 90%. Tasu on 2€/h. Keskmine parkimisaeg on 3h. Kui suur on päevatulu?',
+        answer: 432,
+        tolerance: 10,
+        hint: '80 * 0.9 = 72 autot. 72 * 2€ * 3h = 432€',
+        calc: '80 * 0.9 = 72 autot. 72 * 2€ * 3h = 432€'
+    },
+    {
+        title: '🚦 Liiklusvoo tihedus',
+        text: 'Ristmikul läbib 1200 tunnis sõidukit. Foori tsükkel on 60s, roheline kestab 27s. Mitu sõidukit läheb läbi ühe rohelise jooksul?',
+        answer: 540,
+        tolerance: 20,
+        hint: '1200/h = 20/min. Roheline on 27/60 min. 20 * (27/60) * 60 = 540',
+        calc: '1200/h = 20/min. 20 * 27 = 540 sõidukit rohelise ajal'
+    },
+    {
+        title: '🛞 Pidurdusmaa märgista',
+        text: 'Kiirus 70 km/h, mõjutegor 0.4 (märg teekate). Mis on pidurdusmaa? Valem: (v/10)² * mõjutegor',
+        answer: 19.6,
+        tolerance: 0.5,
+        hint: '(70/10)² * 0.4 = 49 * 0.4 = 19.6m',
+        calc: '(70/10)² * 0.4 = 7² * 0.4 = 49 * 0.4 = 19.6m'
+    },
+    {
+        title: '🅿️ Parkimiskoha leidmine',
+        text: 'Linnas on 1 parkimiskoht 1000 elaniku kohta. Linnas on 50,000 elanikku. Mitu parkimiskohta on vaja?',
+        answer: 50,
+        tolerance: 0,
+        hint: '50,000 / 1000 = 50 parkimiskohta',
+        calc: '50,000 / 1000 = 50 parkimiskohta'
+    },
+    {
+        title: '🚗 Kütusekulu kiirendus',
+        text: 'Auto kütusekulus on 8L/100km. Kiirendades 60→100 km/h kulus suureneb 30%. Kui palju kulus 100km/h kiirusel 200km sõiduks?',
+        answer: 20.8,
+        tolerance: 0.5,
+        hint: '8 * 1.3 = 10.4L/100km. 10.4 * 2 = 20.8L',
+        calc: '8 * 1.3 = 10.4L/100km. 10.4 * 2 = 20.8L'
+    }
+];
+
+let currentTextTask = null;
+
+function showTextTask() {
+    currentTextTask = textTasks[Math.floor(Math.random() * textTasks.length)];
+    const area = document.getElementById('quiz-area');
+    area.innerHTML = `<div class="text-task">
+        <h3>${currentTextTask.title}</h3>
+        <p>${currentTextTask.text}</p>
+        <input type="number" id="text-answer" placeholder="Sisesta vastus..." step="0.01">
+        <button onclick="checkTextAnswer()" style="margin-top:4px">Kontrolli</button>
+        <div class="result" id="text-result"></div>
+        <div class="calc-box" id="calc-box" style="display:none">${currentTextTask.calc}</div>
+    </div>`;
+}
+
+function checkTextAnswer() {
+    const input = document.getElementById('text-answer');
+    const result = document.getElementById('text-result');
+    const calcBox = document.getElementById('calc-box');
+    const val = parseFloat(input.value);
+    if (isNaN(val)) {
+        result.textContent = 'Sisesta number!';
+        result.style.color = '#f39c12';
+        return;
+    }
+    const diff = Math.abs(val - currentTextTask.answer);
+    if (diff <= currentTextTask.tolerance) {
+        result.textContent = '✅ Õige! +' + (75 * level) + ' punkti';
+        result.style.color = '#2ecc71';
+        score += 75 * level;
+        calcBox.style.display = 'block';
+    } else {
+        result.textContent = '❌ Vale. Õige vastus: ' + currentTextTask.answer + '. ' + currentTextTask.hint;
+        result.style.color = '#c0392b';
+        calcBox.style.display = 'block';
+    }
+    updateUI();
+}
+
 function setMode(m) {
     mode = m;
     document.querySelectorAll('#sidebar button').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    if (event && event.target) event.target.classList.add('active');
     document.getElementById('quiz-area').innerHTML = '';
     
     if (m === 'foor') {
         intersection.autoMode = true;
         document.getElementById('hint-text').textContent = 'Klõpsa fooril, et vahetada. Jälgi liiklust!';
+    } else if (m === 'parkla') {
+        initParkingLot();
+        drawParkingLot();
+        document.getElementById('hint-text').textContent = 'Leia õige parkimiskoht! Vabu kuvatakse tühjana.';
+    } else if (m === 'parkimine') {
+        initParkingSim();
+        document.getElementById('hint-text').textContent = 'Kasuta nooleklahve ← → ↑ ja Q/E pööramiseks. Parki rohelisse kasti!';
     } else if (m === 'kiirus') {
         showQuiz();
         document.getElementById('hint-text').textContent = 'Arvuta õige vastus kiiruse küsimustele.';
@@ -355,6 +712,9 @@ function setMode(m) {
         document.getElementById('hint-text').textContent = 'Anna prioriteet kiirabile ja bussidele!';
     } else if (m === 'reaktsioon') {
         startReactionTest();
+    } else if (m === 'ylesanded') {
+        showTextTask();
+        document.getElementById('hint-text').textContent = 'Lahenda praktilised liiklusülesanded arvutustega.';
     } else if (m === 'quiz') {
         showQuiz();
     }
@@ -435,6 +795,12 @@ function gameLoop(time) {
         ctx.font = '16px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(reactionActive ? 'KLÕPSA!' : 'Oota...', W/2, H/2 + 5);
+    }
+    
+    // Parking simulator
+    if (mode === 'parkimine') {
+        updateParkingSim(dt);
+        drawParkingSim();
     }
     
     updateUI();

@@ -1,16 +1,52 @@
 # 🚦 Liiklusreguleerija
 
-Interaktiivne hariv mäng liikluse planeerimise ja reageerimise õpetamiseks.
+Interaktiivne hariv mäng liikluse planeerimise, parkimise ja reageerimise õpetamiseks.
 
 ## 🎮 Mängu tegevused
 
 | Tegevus | Eesmärk | Hariv külg |
 |---------|---------|------------|
 | 🚦 **Fooride juhtimine** | Vaheta foori klikkides | Fooride töö, prioriteedid |
+| 🅿️ **Parkla** | Leia õige vaba parkimiskoht | Parkla struktuur, täituvus |
+| 🅿️ **Parkimine** | Sõida auto parkimiskohas | Ruumiparkimine, manööverdamine |
 | 🏁 **Kiiruse arvutamine** | Vasta küsimustele | Peatumiskaugust, CO2 |
 | 🚑 **Prioriteedid** | Anna kiirabile/bussile eesõigus | Liikluse prioriteedid |
 | ⚡ **Reaktsioonid** | Klõpsa rohelisel | Reageerimise aeg |
-| ❓ **Kvissiülesanne** | Vasta küsimustele | Liiklusreeglid |
+| 📝 **Tekstülesanded** | Lahenda arvutusülesanded | Kütusekulu, parkimistasu, sõidukaugus |
+| ❓ **Kvissiülesanne** | Vasta valikvastustele | Liiklusreeglid |
+
+## 📝 Tekstülesanded (18 ülesannet)
+
+Praktilised arvutusülesanded:
+- 🅿️ Parkimistasu arvutamine (Tallinna kesklinn)
+- ⛽ Kütusekulu ja hind
+- 🅿️ Parkla täituvus
+- 🚗 Kiirus ja aeg
+- 🅿️ Parkimismaks (ümardamisreeglid)
+- 🛞 Rehvi rõhk
+- 🚦 Foori ooteaeg (tõenäosus)
+- 🅿️ Ruumiparkimise pindala
+- ⛽ Elektriauto laadimine
+- 🚗 Sõidukulu km kohta
+- 🅿️ Parkimisautomaat
+- 🚗 Sõidukaugus (reageerimisaeg)
+- 🅿️ Parkla tulu
+- 🚦 Liiklusvoo tihedus
+- 🛞 Pidurdusmaa märgista
+- 🅿️ Parkimiskoha leidmine
+- 🚗 Kütusekulu kiirendus
+
+## 🅿️ Parkla mäng
+
+- 4×6 parkimisplatsi, osaliselt hõivatud
+- Tärniga märgitud koht on sihtkoht
+- Klõpsa õigele kohale
+
+## 🅿️ Parkimine simulaator
+
+- Kasuta nooleklahve ← → ↑ ja Q/E pööramiseks
+- Sõida auto rohelisse parkimiskasti
+- +100 punkti õige manöövri eest
 
 ## 📊 Mõõdikud
 
@@ -24,7 +60,7 @@ Interaktiivne hariv mäng liikluse planeerimise ja reageerimise õpetamiseks.
 
 Juhuslikud sündmused 15-25s tagant:
 - 🚑 Kiirabi saabub
-- ⚠️ õnnetus teel
+- ⚠️ Õnnetus teel
 - 🚌 Bussiprioriteet
 - 🌧️ Vihm
 - 🏎️ Kiiruspiirang
@@ -40,14 +76,6 @@ python3 -m http.server 8080
 # Ava: http://localhost:8080
 ```
 
-## 📕 Reeglid
-
-1. Klõpsa fooril, et muuta punane → roheline
-2. Kiirabi ja bussid saavad märguande
-3. Vasta küsimustele punktide saamiseks
-4. Tase tõuseb iga 500 punkti tagant
-5. Ülesanded muutuvad raskemaks kõrgemal tasemel
-
 ## 🧠 Õppimine
 
 - **Fooride töö** — mõista tsükleid ja ooteaegu
@@ -55,3 +83,4 @@ python3 -m http.server 8080
 - **CO2** — seismine = heide (keskmiselt 2.3 kg/h)
 - **Reaktsioon** — keskmiselt 1.5s otsustamine
 - **Prioriteedid** — kiirabi alati esiteisigi
+- **Parkimine** — arvutused, mõõtmed, tasu
