@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Liiklusreguleerija</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #eee; overflow: hidden; }
+#app { display: flex; height: 100vh; }
+#sidebar { width: 280px; background: #16213e; padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+#main { flex: 1; position: relative; }
+canvas { display: block; }
+h1 { font-size: 1.2em; color: #e94560; text-align: center; }
+h2 { font-size: 0.9em; color: #0f3460; background: #e94560; padding: 6px 10px; border-radius: 4px; margin-bottom: 8px; }
+.stat { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.85em; }
+.stat span:last-child { color: #e94560; font-weight: bold; }
+button { background: #0f3460; color: #eee; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85em; transition: all 0.2s; width: 100%; text-align: left; }
+button:hover { background: #e94560; transform: translateX(4px); }
+button.active { background: #e94560; }
+.quiz-box { background: #0f3460; padding: 12px; border-radius: 8px; margin-top: 8px; }
+.quiz-q { font-size: 0.85em; margin-bottom: 8px; }
+.quiz-options { display: flex; flex-direction: column; gap: 4px; }
+.quiz-options button { font-size: 0.8em; padding: 6px 10px; }
+.correct { background: #2ecc71 !important; }
+.wrong { background: #c0392b !important; }
+#event-banner { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: #e94560; padding: 12px 24px; border-radius: 8px; font-weight: bold; display: none; z-index: 100; animation: pulse 0.5s ease; }
+@keyframes pulse { 0%,100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.05); } }
+#score-display { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: 8px; font-size: 0.9em; }
+#level-display { position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: 8px; font-size: 0.9em; }
+.hint { font-size: 0.75em; color: #888; margin-top: 4px; font-style: italic; }
+</style>
+</head>
+<body>
+<div id="app">
+<div id="sidebar">
+<h1>🚦 Liiklusreguleerija</h2>
+<div><h2>📊 Statistika</h2>
+<div class="stat"><span>Sõidukid kokku:</span><span id="s-vehicles">0</span></div>
+<div class="stat"><span>Keskmine ooteaeg:</span><span id="s-wait">0s</span></div>
+<div class="stat"><span>CO2 heide:</span><span id="s-co2">0 kg</span></div>
+<div class="stat"><span>Õnnestumine:</span><span id="s-success">0%</span></div>
+<div class="stat"><span>Kiiruskeskmine:</span><span id="s-speed">0 km/h</span></div>
+</div>
+<div><h2>🎮 Tegevused</h2>
+<button onclick="setMode('foor')">🚦 Fooride juhtimine</button>
+<button onclick="setMode('kiirus')">🏁 Kiiruse arvutamine</button>
+<button onclick="setMode('prioriteet')">🚑 Prioriteedid</button>
+<button onclick="setMode('reaktsioon')">⚡ Reaktsioonid</button>
+<button onclick="setMode('quiz')">❓ Kvissiülesanne</button>
+</div>
+<div id="quiz-area"></div>
+<div class="hint" id="hint-text">Vali tegevus alustamiseks. Klõpsa fooridel või vasta küsimustele.</div>
+</div>
+<div id="main">
+<canvas id="canvas"></canvas>
+<div id="event-banner"></div>
+<div id="score-display">🏆 Punktid: <span id="score">0</span></div>
+<div id="level-display">Tase: <span id="level">1</span></div>
+</div>
+</div>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() {
+    const main = document.getElementById('main');
+    W = canvas.width = main.clientWidth;
+    H = canvas.height = main.clientHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Game state
+let score = 0, level = 1, mode = 'foor';
+let vehicles = [], totalVehicles = 0, totalWait = 0, totalCO2 = 0, successCount = 0;
+let intersection = { x: 0, y: 0, lights: { ns: 'red', ew: 'red' }, timer: 0, autoMode: true };
+let events = [], currentEvent = null, eventTimer = 0;
+let quiz = null, quizAnswered = false;
+let reactionStart = 0, reactionActive = false, reactionTime = 0;
+let priorityQueue = [];
+
+// Vehicle class
+class Vehicle {
+    constructor(lane) {
+        this.lane = lane; // 'N','S','E','W'
+        this.speed = 0;
+        this.maxSpeed = 2 + Math.random();
+        this.waiting = false;
+        this.waitTime = 0;
+        this.co2 = 0;
+        this.isEmergency = Math.random() < 0.05;
+        this.isBus = Math.random() < 0.1;
+        this.color = this.isEmergency ? '#ff0' : this.isBus ? '#f80' : `hsl(${Math.random()*360},70%,50%)`;
+        this.size = this.isBus ? 14 : 10;
+        
+        if (lane === 'N') { this.x = intersection.x - 20; this.y = 0; this.dx = 0; this.dy = 1; }
+        else if (lane === 'S') { this.x = intersection.x + 20; this.y = H; this.dx = 0; this.dy = -1; }
+        else if (lane === 'E') { this.x = W; this.y = intersection.y - 20; this.dx = -1; this.dy = 0; }
+        else { this.x = 0; this.y = intersection.y + 20; this.dx = 1; this.dy = 0; }
+    }
+    
+    update(dt) {
+        const stopY = intersection.y - 60;
+        const stopX = intersection.x - 60;
+        const stopY2 = intersection.y + 60;
+        const stopX2 = intersection.x + 60;
+        
+        let shouldStop = false;
+        const distToIntersection = Math.abs((this.dy !== 0 ? this.y - intersection.y : this.x - intersection.x));
+        
+        if (distToIntersection < 80 && distToIntersection > 10) {
+            if (this.dy > 0 && intersection.lights.ns === 'red') shouldStop = true;
+            if (this.dy < 0 && intersection.lights.ns === 'red') shouldStop = true;
+            if (this.dx > 0 && intersection.lights.ew === 'red') shouldStop = true;
+            if (this.dx < 0 && intersection.lights.ew === 'red') shouldStop = true;
+        }
+        
+        // Priority: emergency vehicles don't stop
+        if (this.isEmergency) shouldStop = false;
+        
+        if (shouldStop) {
+            this.waiting = true;
+            this.waitTime += dt;
+            this.co2 += dt * 0.01;
+            this.speed = Math.max(0, this.speed - 5 * dt);
+        } else {
+            this.waiting = false;
+            this.speed = Math.min(this.maxSpeed, this.speed + 3 * dt);
+        }
+        
+        this.x += this.dx * this.speed;
+        this.y += this.dy * this.speed;
+        
+        // Remove if off screen
+        return this.x > -50 && this.x < W + 50 && this.y > -50 && this.y < H + 50;
+    }
+    
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        if (this.dx !== 0) ctx.rotate(this.dx > 0 ? 0 : Math.PI);
+        else ctx.rotate(this.dy > 0 ? Math.PI/2 : -Math.PI/2);
+        
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-this.size/2, -this.size/3, this.size, this.size/1.5);
+        
+        if (this.isEmergency) {
+            ctx.fillStyle = '#f00';
+            ctx.beginPath();
+            ctx.arc(0, -this.size/2, 3, 0, Math.PI*2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+}
+
+// Spawn vehicles
+let spawnTimer = 0;
+function spawnVehicle(dt) {
+    spawnTimer += dt;
+    const rate = Math.max(0.5, 2 - level * 0.2);
+    if (spawnTimer > rate) {
+        spawnTimer = 0;
+        const lanes = ['N', 'S', 'E', 'W'];
+        vehicles.push(new Vehicle(lanes[Math.floor(Math.random() * 4)]));
+    }
+}
+
+// Traffic light logic
+function updateLights(dt) {
+    if (!intersection.autoMode) return;
+    intersection.timer += dt;
+    const greenTime = Math.max(2, 5 - level * 0.3);
+    if (intersection.timer > greenTime) {
+        intersection.timer = 0;
+        if (intersection.lights.ns === 'green') {
+            intersection.lights.ns = 'yellow';
+            intersection.lights.ew = 'red';
+        } else if (intersection.lights.ns === 'yellow') {
+            intersection.lights.ns = 'red';
+            intersection.lights.ew = 'green';
+        } else if (intersection.lights.ew === 'green') {
+            intersection.lights.ew = 'yellow';
+            intersection.lights.ns = 'red';
+        } else {
+            intersection.lights.ns = 'green';
+            intersection.lights.ew = 'red';
+        }
+    }
+}
+
+// Draw intersection
+function drawIntersection() {
+    intersection.x = W / 2;
+    intersection.y = H / 2;
+    
+    // Roads
+    ctx.fillStyle = '#333';
+    ctx.fillRect(0, intersection.y - 40, W, 80);
+    ctx.fillRect(intersection.x - 40, 0, 80, H);
+    
+    // Lane markings
+    ctx.strokeStyle = '#fff';
+    ctx.setLineDash([20, 15]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, intersection.y); ctx.lineTo(W, intersection.y);
+    ctx.moveTo(intersection.x, 0); ctx.lineTo(intersection.x, H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Traffic lights
+    drawLight(intersection.x - 45, intersection.y - 45, intersection.lights.ns);
+    drawLight(intersection.x + 45, intersection.y + 45, intersection.lights.ns);
+    drawLight(intersection.x - 45, intersection.y + 45, intersection.lights.ew);
+    drawLight(intersection.x + 45, intersection.y - 45, intersection.lights.ew);
+}
+
+function drawLight(x, y, color) {
+    ctx.fillStyle = '#222';
+    ctx.fillRect(x - 8, y - 18, 16, 36);
+    ctx.fillStyle = color === 'red' ? '#f00' : color === 'yellow' ? '#ff0' : '#0f0';
+    ctx.beginPath();
+    ctx.arc(x, y === intersection.y - 45 ? -8 : 8, 5, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Events
+const eventTypes = [
+    { text: '🚑 Kiirabi saabub! Anna tee!', type: 'emergency', hint: 'Muuda foor punasest roheliseks kiirabi suunas' },
+    { text: '⚠️ Õnnetus teel! Aeglusta liiklust!', type: 'accident', hint: 'Hoia foor pikemal punasel' },
+    { text: '🚌 Linnabusse on palju peale! Prioriteet!', type: 'bus', hint: 'Anna bussile roheline' },
+    { text: '🌧️ Vihm! Vähenda kiirust!', type: 'weather', hint: 'Pikenda punast ettevaatusteks' },
+    { text: '🏎️ Kiirab sõidab piirangus!', type: 'speed', hint: 'Kontrolli kiirust' }
+];
+
+function triggerEvent() {
+    currentEvent = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+    eventTimer = 8;
+    showBanner(currentEvent.text);
+    intersection.autoMode = false;
+    
+    if (currentEvent.type === 'emergency') {
+        vehicles.push(new Vehicle(['N','S','E','W'][Math.floor(Math.random()*4)]));
+        vehicles[vehicles.length-1].isEmergency = true;
+        vehicles[vehicles.length-1].color = '#ff0';
+    }
+}
+
+function showBanner(text) {
+    const banner = document.getElementById('event-banner');
+    banner.textContent = text;
+    banner.style.display = 'block';
+    setTimeout(() => banner.style.display = 'none', 3000);
+}
+
+// Quiz system
+const quizQuestions = [
+    { q: 'Kui pikk on peatumiskaugust 60 km/h kiirusel? (mõjutegur 0.7, teekate kuiv)', options: ['~35m', '~50m', '~25m', '~60m'], a: 0, hint: 'Valem: (v/10)² + (v/10)*3. Kiire reageerimine = lühem pidurdus.' },
+    { q: 'Kumb on prioriteet ristmikul?', options: ['Paremalt tulev', 'Kiirabi', 'Tramm', 'Buss'], a: 1, hint: 'Kiirabi alati esiteisigi, isegi kui paremal on keegi.' },
+    { q: 'CO2 heide seismisel mootoriga?', options: ['0 kg/h', '~2.3 kg/h', '~5 kg/h', '~1 kg/h'], a: 1, hint: 'Bensiin keskmiselt ~2.3 kg CO2 liitri kohta.' },
+    { q: 'Kui kaua võtab reageerimine keskmiselt?', options: ['0.5s', '1.5s', '2.5s', '3s'], a: 1, hint: 'Inimene vajab ~1.5s otsustamaks ja reageerimaks.' },
+    { q: 'Kas foori punane + kollane tähendab?', options: ['Mine kohe', 'Valmistu sõitma', 'Seisa', 'Pööra paremale'], a: 1, hint: 'Punane+kollane = valmistumine, mitte sõitmine.' },
+    { q: 'Kui palju vähendab kiirus 80→50 km/h CO2?', options: ['~10%', '~25%', '~40%', '~50%'], a: 2, hint: 'Madalam kiirus = tõhusam kütuse kasutus.' },
+    { q: 'Kumb foori värv tähendab "seisa"?', options: ['Kollane', 'Punane', 'Roheline', 'Vikervalgus'], a: 1, hint: 'Punane = stop igal juhul.' },
+    { q: 'Õnnetuste % "inimlik viga" põhjustel?', options: ['~30%', '~50%', '~70%', '~90%'], a: 3, hint: 'Enamik on tingitud tähelepanu häirumisest või kiirusest.' }
+];
+
+function showQuiz() {
+    quizAnswered = false;
+    quiz = quizQuestions[Math.floor(Math.random() * quizQuestions.length)];
+    const area = document.getElementById('quiz-area');
+    area.innerHTML = `<div class="quiz-box"><div class="quiz-q">${quiz.q}</div><div class="quiz-options">${quiz.options.map((o,i) => `<button onclick="answerQuiz(${i})">${o}</button>`).join('')}</div><div class="hint" id="quiz-hint"></div></div>`;
+}
+
+function answerQuiz(idx) {
+    if (quizAnswered) return;
+    quizAnswered = true;
+    const buttons = document.querySelectorAll('.quiz-options button');
+    buttons.forEach((b, i) => {
+        if (i === quiz.a) b.classList.add('correct');
+        else if (i === idx) b.classList.add('wrong');
+    });
+    if (idx === quiz.a) {
+        score += 100 * level;
+        document.getElementById('quiz-hint').textContent = '✅ Õige! +' + (100*level) + ' punkti. ' + quiz.hint;
+    } else {
+        document.getElementById('quiz-hint').textContent = '❌ Vale. ' + quiz.hint;
+    }
+    updateUI();
+}
+
+// Reaction test
+function startReactionTest() {
+    reactionActive = true;
+    reactionStart = performance.now();
+    document.getElementById('hint-text').textContent = '⏵ Oota rohelist foori ja klõpsa!';
+}
+
+canvas.addEventListener('click', (e) => {
+    if (mode === 'foor') {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        // Check if clicked near a traffic light
+        const lights = [
+            { x: intersection.x - 45, y: intersection.y - 45, dir: 'ns' },
+            { x: intersection.x + 45, y: intersection.y + 45, dir: 'ns' },
+            { x: intersection.x - 45, y: intersection.y + 45, dir: 'ew' },
+            { x: intersection.x + 45, y: intersection.y - 45, dir: 'ew' }
+        ];
+        for (const l of lights) {
+            if (Math.abs(mx - l.x) < 20 && Math.abs(my - l.y) < 25) {
+                if (intersection[l.dir] === 'red') {
+                    intersection[l.dir] = 'green';
+                    intersection[l.dir === 'ns' ? 'ew' : 'ns'] = 'red';
+                    score += 10;
+                    intersection.autoMode = true;
+                    intersection.timer = 0;
+                    if (currentEvent) {
+                        eventTimer = 0;
+                        currentEvent = null;
+                    }
+                }
+                break;
+            }
+        }
+    }
+    if (mode === 'reaktsioon' && reactionActive) {
+        reactionTime = (performance.now() - reactionStart) / 1000;
+        reactionActive = false;
+        if (reactionTime < 1) { score += 150; showBanner('⚡ Suurepärane reaktsioon!'); }
+        else if (reactionTime < 2) { score += 75; showBanner('👍 Hea reaktsioon'); }
+        else { showBanner('🐢 Aeglane...'); }
+        document.getElementById('hint-text').textContent = `Reaktsioon: ${reactionTime.toFixed(2)}s`;
+        setTimeout(() => { if (mode === 'reaktsioon') startReactionTest(); }, 2000);
+        updateUI();
+    }
+});
+
+function setMode(m) {
+    mode = m;
+    document.querySelectorAll('#sidebar button').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('quiz-area').innerHTML = '';
+    
+    if (m === 'foor') {
+        intersection.autoMode = true;
+        document.getElementById('hint-text').textContent = 'Klõpsa fooril, et vahetada. Jälgi liiklust!';
+    } else if (m === 'kiirus') {
+        showQuiz();
+        document.getElementById('hint-text').textContent = 'Arvuta õige vastus kiiruse küsimustele.';
+    } else if (m === 'prioriteet') {
+        intersection.autoMode = false;
+        document.getElementById('hint-text').textContent = 'Anna prioriteet kiirabile ja bussidele!';
+    } else if (m === 'reaktsioon') {
+        startReactionTest();
+    } else if (m === 'quiz') {
+        showQuiz();
+    }
+}
+
+// Update UI
+function updateUI() {
+    document.getElementById('score').textContent = score;
+    document.getElementById('level').textContent = level;
+    document.getElementById('s-vehicles').textContent = totalVehicles;
+    document.getElementById('s-wait').textContent = totalVehicles > 0 ? (totalWait/totalVehicles).toFixed(1)+'s' : '0s';
+    document.getElementById('s-co2').textContent = totalCO2.toFixed(2)+' kg';
+    document.getElementById('s-success').textContent = totalVehicles > 0 ? Math.round(successCount/totalVehicles*100)+'%' : '0%';
+    const avgSpd = vehicles.length > 0 ? vehicles.reduce((s,v) => s+v.speed, 0)/vehicles.length : 0;
+    document.getElementById('s-speed').textContent = (avgSpd * 20).toFixed(0)+' km/h';
+    
+    // Level up
+    const newLevel = Math.floor(score / 500) + 1;
+    if (newLevel > level) {
+        level = newLevel;
+        showBanner('⬆️ Tase ' + level + '!');
+    }
+}
+
+// Main loop
+let lastTime = 0;
+let eventSpawnTimer = 0;
+
+function gameLoop(time) {
+    const dt = Math.min((time - lastTime) / 1000, 0.1);
+    lastTime = time;
+    
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, W, H);
+    
+    drawIntersection();
+    
+    spawnVehicle(dt);
+    updateLights(dt);
+    
+    // Update vehicles
+    vehicles = vehicles.filter(v => {
+        const alive = v.update(dt);
+        if (!alive) {
+            totalVehicles++;
+            totalWait += v.waitTime;
+            totalCO2 += v.co2;
+            if (v.waitTime < 3) successCount++;
+            return false;
+        }
+        return true;
+    });
+    
+    // Draw vehicles
+    vehicles.forEach(v => v.draw());
+    
+    // Events
+    eventSpawnTimer += dt;
+    if (eventSpawnTimer > 15 + Math.random() * 10 && !currentEvent) {
+        eventSpawnTimer = 0;
+        triggerEvent();
+    }
+    if (currentEvent) {
+        eventTimer -= dt;
+        if (eventTimer <= 0) {
+            currentEvent = null;
+            intersection.autoMode = true;
+        }
+    }
+    
+    // Reaction mode visual
+    if (mode === 'reaktsioon') {
+        ctx.fillStyle = reactionActive ? '#0f0' : '#666';
+        ctx.beginPath();
+        ctx.arc(W/2, H/2, 60, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(reactionActive ? 'KLÕPSA!' : 'Oota...', W/2, H/2 + 5);
+    }
+    
+    updateUI();
+    requestAnimationFrame(gameLoop);
+}
+
+// Start
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
