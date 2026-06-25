@@ -68,6 +68,7 @@ button.active { background: #e94560; }
 </div>
 <div id="quiz-area"></div>
 <div class="hint" id="hint-text">Vali tegevus alustamiseks. Klõpsa fooridel või vasta küsimustele.</div>
+<div style="margin-top:auto"><button onclick="resetGame()" style="background:#555;font-size:0.75em;padding:6px">🔄 Lähtesta punktid</button></div>
 </div>
 <div id="main">
 <canvas id="canvas"></canvas>
@@ -89,12 +90,14 @@ resize();
 window.addEventListener('resize', resize);
 
 // Game state
-let score = 0, level = 1, mode = 'foor';
+let score = parseInt(localStorage.getItem('traffic_score') || '0');
+let level = parseInt(localStorage.getItem('traffic_level') || '1');
+let mode = 'foor';
 let vehicles = [], totalVehicles = 0, totalWait = 0, totalCO2 = 0, successCount = 0;
 let intersection = { x: 0, y: 0, lights: { ns: 'red', ew: 'red' }, timer: 0, autoMode: true };
 let events = [], currentEvent = null, eventTimer = 0;
 let quiz = null, quizAnswered = false;
-let reactionStart = 0, reactionActive = false, reactionTime = 0;
+let reactionStart = 0, reactionActive = false, reactionTime = 0, reactionTimeout = null;
 let priorityQueue = [];
 
 // Vehicle class
@@ -318,6 +321,14 @@ function startReactionTest() {
     reactionActive = true;
     reactionStart = performance.now();
     document.getElementById('hint-text').textContent = '⏵ Oota rohelist foori ja klõpsa!';
+    reactionTimeout = setTimeout(() => {
+        if (reactionActive) {
+            reactionActive = false;
+            showBanner('⏰ Aeg läbi!');
+            document.getElementById('hint-text').textContent = 'Aeg läbi! Uus katse...';
+            setTimeout(() => { if (mode === 'reaktsioon') startReactionTest(); }, 1500);
+        }
+    }, 5000);
 }
 
 // Keyboard controls for parking sim
@@ -386,6 +397,7 @@ canvas.addEventListener('click', (e) => {
         }
     }
     if (mode === 'reaktsioon' && reactionActive) {
+        clearTimeout(reactionTimeout);
         reactionTime = (performance.now() - reactionStart) / 1000;
         reactionActive = false;
         if (reactionTime < 1) { score += 150; showBanner('⚡ Suurepärane reaktsioon!'); }
@@ -657,11 +669,12 @@ function showTextTask() {
     area.innerHTML = `<div class="text-task">
         <h3>${currentTextTask.title}</h3>
         <p>${currentTextTask.text}</p>
-        <input type="number" id="text-answer" placeholder="Sisesta vastus..." step="0.01">
+        <input type="number" id="text-answer" placeholder="Sisesta vastus ja vajuta Enter..." step="0.01" onkeydown="if(event.key==='Enter')checkTextAnswer()">
         <button onclick="checkTextAnswer()" style="margin-top:4px">Kontrolli</button>
         <div class="result" id="text-result"></div>
         <div class="calc-box" id="calc-box" style="display:none">${currentTextTask.calc}</div>
     </div>`;
+    document.getElementById('text-answer').focus();
 }
 
 function checkTextAnswer() {
@@ -737,6 +750,10 @@ function updateUI() {
         level = newLevel;
         showBanner('⬆️ Tase ' + level + '!');
     }
+    
+    // Persist
+    localStorage.setItem('traffic_score', score);
+    localStorage.setItem('traffic_level', level);
 }
 
 // Main loop
@@ -809,6 +826,19 @@ function gameLoop(time) {
 
 // Start
 requestAnimationFrame(gameLoop);
+
+function resetGame() {
+    score = 0;
+    level = 1;
+    totalVehicles = 0;
+    totalWait = 0;
+    totalCO2 = 0;
+    successCount = 0;
+    localStorage.removeItem('traffic_score');
+    localStorage.removeItem('traffic_level');
+    updateUI();
+    showBanner('🔄 Lähtestatud!');
+}
 </script>
 </body>
 </html>
