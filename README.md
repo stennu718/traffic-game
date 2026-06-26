@@ -1,3 +1,6 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![HTML](https://img.shields.io/badge/HTML5-orange.svg)](https://developer.mozilla.org/en-US/docs/Web/HTML)
+
 # 🚦 Liiklusreguleerija
 
 Interaktiivne hariv mäng liikluse planeerimise, parkimise ja reageerimise õpetamiseks. Eesti keeles, täielikult lokaliseeritud.
