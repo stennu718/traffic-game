@@ -98,6 +98,7 @@ let intersection = { x: 0, y: 0, lights: { ns: 'red', ew: 'red' }, timer: 0, aut
 let events = [], currentEvent = null, eventTimer = 0;
 let quiz = null, quizAnswered = false;
 let reactionStart = 0, reactionActive = false, reactionTime = 0, reactionTimeout = null;
+let reactionRetryTimeout = null;
 let priorityQueue = [];
 
 // Vehicle class
@@ -296,7 +297,27 @@ function showQuiz() {
     quizAnswered = false;
     quiz = quizQuestions[Math.floor(Math.random() * quizQuestions.length)];
     const area = document.getElementById('quiz-area');
-    area.innerHTML = `<div class="quiz-box"><div class="quiz-q">${quiz.q}</div><div class="quiz-options">${quiz.options.map((o,i) => `<button onclick="answerQuiz(${i})">${o}</button>`).join('')}</div><div class="hint" id="quiz-hint"></div></div>`;
+    area.textContent = '';
+    const box = document.createElement('div');
+    box.className = 'quiz-box';
+    const qDiv = document.createElement('div');
+    qDiv.className = 'quiz-q';
+    qDiv.textContent = quiz.q;
+    box.appendChild(qDiv);
+    const optionsDiv = document.createElement('div');
+    optionsDiv.className = 'quiz-options';
+    quiz.options.forEach((o, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = o;
+        btn.onclick = () => answerQuiz(i);
+        optionsDiv.appendChild(btn);
+    });
+    box.appendChild(optionsDiv);
+    const hintDiv = document.createElement('div');
+    hintDiv.className = 'hint';
+    hintDiv.id = 'quiz-hint';
+    box.appendChild(hintDiv);
+    area.appendChild(box);
 }
 
 function answerQuiz(idx) {
@@ -318,6 +339,10 @@ function answerQuiz(idx) {
 
 // Reaction test
 function startReactionTest() {
+    // Clear any existing reaction timeouts before starting a new one
+    if (reactionTimeout) { clearTimeout(reactionTimeout); reactionTimeout = null; }
+    if (reactionRetryTimeout) { clearTimeout(reactionRetryTimeout); reactionRetryTimeout = null; }
+
     reactionActive = true;
     reactionStart = performance.now();
     document.getElementById('hint-text').textContent = '⏵ Oota rohelist foori ja klõpsa!';
@@ -326,7 +351,7 @@ function startReactionTest() {
             reactionActive = false;
             showBanner('⏰ Aeg läbi!');
             document.getElementById('hint-text').textContent = 'Aeg läbi! Uus katse...';
-            setTimeout(() => { if (mode === 'reaktsioon') startReactionTest(); }, 1500);
+            reactionRetryTimeout = setTimeout(() => { if (mode === 'reaktsioon') startReactionTest(); }, 1500);
         }
     }, 5000);
 }
@@ -404,7 +429,7 @@ canvas.addEventListener('click', (e) => {
         else if (reactionTime < 2) { score += 75; showBanner('👍 Hea reaktsioon'); }
         else { showBanner('🐢 Aeglane...'); }
         document.getElementById('hint-text').textContent = `Reaktsioon: ${reactionTime.toFixed(2)}s`;
-        setTimeout(() => { if (mode === 'reaktsioon') startReactionTest(); }, 2000);
+        reactionRetryTimeout = setTimeout(() => { if (mode === 'reaktsioon') startReactionTest(); }, 2000);
         updateUI();
     }
 });
@@ -429,39 +454,61 @@ function initParkingLot() {
 
 function drawParkingLot() {
     const area = document.getElementById('quiz-area');
-    let html = '<div style="margin-top:8px"><div style="text-align:center;font-size:0.85em;margin-bottom:8px">🅿️ <b>Parkla</b> — vabu: ' + parkingLot.spots.filter(s=>!s.occupied).length + '/' + parkingLot.spots.length + '</div>';
-    html += '<div style="background:#333;padding:8px;border-radius:8px;margin-bottom:8px">';
+    area.textContent = '';
+    const container = document.createElement('div');
+    container.style.marginTop = '8px';
+    const header = document.createElement('div');
+    header.style.textAlign = 'center';
+    header.style.fontSize = '0.85em';
+    header.style.marginBottom = '8px';
+    header.textContent = '🅿️ Parkla — vabu: ' + parkingLot.spots.filter(s=>!s.occupied).length + '/' + parkingLot.spots.length;
+    container.appendChild(header);
+    const lotDiv = document.createElement('div');
+    lotDiv.style.background = '#333';
+    lotDiv.style.padding = '8px';
+    lotDiv.style.borderRadius = '8px';
+    lotDiv.style.marginBottom = '8px';
     for (let r = 0; r < parkingLot.rows; r++) {
-        html += '<div class="parking-row">';
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'parking-row';
         for (let c = 0; c < parkingLot.cols; c++) {
             const spot = parkingLot.spots[r * parkingLot.cols + c];
-            let cls = 'parking-spot';
-            if (spot.occupied) cls += ' occupied';
-            if (spot.id === parkingLot.targetSpot) cls += ' target';
-            const icon = spot.occupied ? '🚗' : (spot.id === parkingLot.targetSpot ? '⭐' : '');
-            html += `<div class="${cls}" onclick="clickParkingSpot(${spot.id})">${icon}</div>`;
+            const spotDiv = document.createElement('div');
+            spotDiv.className = 'parking-spot' + (spot.occupied ? ' occupied' : '') + (spot.id === parkingLot.targetSpot ? ' target' : '');
+            spotDiv.textContent = spot.occupied ? '🚗' : (spot.id === parkingLot.targetSpot ? '⭐' : '');
+            spotDiv.onclick = () => clickParkingSpot(spot.id);
+            rowDiv.appendChild(spotDiv);
         }
-        html += '</div>';
-        if (r === 1) html += '<div style="height:8px"></div>'; // aisle
+        lotDiv.appendChild(rowDiv);
+        if (r === 1) {
+            const aisle = document.createElement('div');
+            aisle.style.height = '8px';
+            lotDiv.appendChild(aisle);
+        }
     }
-    html += '</div><div class="hint" id="parking-hint">Klõpsa tähistatud ⭐ kohale, et parkida</div></div>';
-    area.innerHTML = html;
+    container.appendChild(lotDiv);
+    const hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.id = 'parking-hint';
+    hint.textContent = 'Klõpsa tähistatud ⭐ kohale, et parkida';
+    container.appendChild(hint);
+    area.appendChild(container);
 }
 
 function clickParkingSpot(id) {
     const spot = parkingLot.spots[id];
     const hint = document.getElementById('parking-hint');
     if (spot.id === parkingLot.targetSpot) {
-        hint.innerHTML = '✅ Tubli! Õige koht! +50 punkti';
+        hint.textContent = '✅ Tubli! Õige koht! +50 punkti';
         hint.style.color = '#2ecc71';
         score += 50;
         spot.occupied = true;
         setTimeout(() => { initParkingLot(); drawParkingLot(); }, 1500);
     } else if (spot.occupied) {
-        hint.innerHTML = '❌ See koht on juba hõivatud!';
+        hint.textContent = '❌ See koht on juba hõivatud!';
         hint.style.color = '#c0392b';
     } else {
-        hint.innerHTML = '⚠️ Vaba koht, aga vale. Proovi uuesti!';
+        hint.textContent = '⚠️ Vaba koht, aga vale. Proovi uuesti!';
         hint.style.color = '#f39c12';
     }
     updateUI();
@@ -666,14 +713,38 @@ let currentTextTask = null;
 function showTextTask() {
     currentTextTask = textTasks[Math.floor(Math.random() * textTasks.length)];
     const area = document.getElementById('quiz-area');
-    area.innerHTML = `<div class="text-task">
-        <h3>${currentTextTask.title}</h3>
-        <p>${currentTextTask.text}</p>
-        <input type="number" id="text-answer" placeholder="Sisesta vastus ja vajuta Enter..." step="0.01" onkeydown="if(event.key==='Enter')checkTextAnswer()">
-        <button onclick="checkTextAnswer()" style="margin-top:4px">Kontrolli</button>
-        <div class="result" id="text-result"></div>
-        <div class="calc-box" id="calc-box" style="display:none">${currentTextTask.calc}</div>
-    </div>`;
+    area.textContent = '';
+    const taskDiv = document.createElement('div');
+    taskDiv.className = 'text-task';
+    const h3 = document.createElement('h3');
+    h3.textContent = currentTextTask.title;
+    taskDiv.appendChild(h3);
+    const p = document.createElement('p');
+    p.textContent = currentTextTask.text;
+    taskDiv.appendChild(p);
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.id = 'text-answer';
+    input.placeholder = 'Sisesta vastus ja vajuta Enter...';
+    input.step = '0.01';
+    input.onkeydown = (event) => { if (event.key === 'Enter') checkTextAnswer(); };
+    taskDiv.appendChild(input);
+    const btn = document.createElement('button');
+    btn.textContent = 'Kontrolli';
+    btn.style.marginTop = '4px';
+    btn.onclick = checkTextAnswer;
+    taskDiv.appendChild(btn);
+    const resultDiv = document.createElement('div');
+    resultDiv.className = 'result';
+    resultDiv.id = 'text-result';
+    taskDiv.appendChild(resultDiv);
+    const calcBox = document.createElement('div');
+    calcBox.className = 'calc-box';
+    calcBox.id = 'calc-box';
+    calcBox.style.display = 'none';
+    calcBox.textContent = currentTextTask.calc;
+    taskDiv.appendChild(calcBox);
+    area.appendChild(taskDiv);
     document.getElementById('text-answer').focus();
 }
 
@@ -702,10 +773,15 @@ function checkTextAnswer() {
 }
 
 function setMode(m) {
+    // Clear any pending reaction test timeouts
+    if (reactionTimeout) { clearTimeout(reactionTimeout); reactionTimeout = null; }
+    if (reactionRetryTimeout) { clearTimeout(reactionRetryTimeout); reactionRetryTimeout = null; }
+    reactionActive = false;
+
     mode = m;
     document.querySelectorAll('#sidebar button').forEach(b => b.classList.remove('active'));
     if (event && event.target) event.target.classList.add('active');
-    document.getElementById('quiz-area').innerHTML = '';
+    document.getElementById('quiz-area').textContent = '';
     
     if (m === 'foor') {
         intersection.autoMode = true;
