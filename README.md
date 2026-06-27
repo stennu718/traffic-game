@@ -29,7 +29,20 @@
 
 ---
 
-## 📝 Text Tasks (17 total)
+## Architecture
+
+Single-file HTML5 application with zero dependencies:
+
+```
+index.html          ← UI, styles, game logic (all inline)
+├── Game Engine     ← State machine, scoring, timer
+├── Activities      ← 8 game modes (parking, quiz, text, reaction)
+├── Canvas Renderer ← 2D drawing, animations
+└── Accessibility   ← Keyboard nav, ARIA labels, high contrast
+```
+
+**Tech**: HTML5 Canvas, Vanilla JS, CSS3  
+**Size**: ~167 lines, zero build step, zero dependencies
 
 Each task includes calculation steps and hints. Answers checked with tolerance.
 
