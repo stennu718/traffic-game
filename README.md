@@ -5,7 +5,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![HTML](https://img.shields.io/badge/HTML5-E34F26.svg?logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
 
-**Live:** [github.com/stennu718/traffic-game](https://github.com/stennu718/traffic-game)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg)](https://stennu718.github.io/traffic-game/)
+
+![Gameplay](docs/screenshot.png)
+
+**Live:** [https://stennu718.github.io/traffic-game/](https://stennu718.github.io/traffic-game/)
 
 ---
 
