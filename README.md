@@ -10,6 +10,8 @@
 
 ![Gameplay](docs/screenshot.png)
 
+> **Live:** [https://stennu718.github.io/traffic-game/](https://stennu718.github.io/traffic-game/)
+
 **Live:** [https://stennu718.github.io/traffic-game/](https://stennu718.github.io/traffic-game/)
 
 ---
