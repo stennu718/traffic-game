@@ -6,6 +6,7 @@
 [![HTML](https://img.shields.io/badge/HTML5-E34F26.svg?logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
 
 [![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg)](https://stennu718.github.io/traffic-game/)
+[![Version](https://img.shields.io/github/v/release/stennu718/traffic-game)](https://github.com/stennu718/traffic-game/releases)
 
 ![Gameplay](docs/screenshot.png)
 
