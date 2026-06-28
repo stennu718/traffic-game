@@ -90,8 +90,10 @@ resize();
 window.addEventListener('resize', resize);
 
 // Game state
-let score = parseInt(localStorage.getItem('traffic_score') || '0');
-let level = parseInt(localStorage.getItem('traffic_level') || '1');
+let score = parseInt(localStorage.getItem('traffic_score') || '0', 10);
+let level = parseInt(localStorage.getItem('traffic_level') || '1', 10);
+if (isNaN(score) || score < 0 || score > 1000000) { score = 0; }
+if (isNaN(level) || level < 1 || level > 10) { level = 1; }
 let mode = 'foor';
 let vehicles = [], totalVehicles = 0, totalWait = 0, totalCO2 = 0, successCount = 0;
 let intersection = { x: 0, y: 0, lights: { ns: 'red', ew: 'red' }, timer: 0, autoMode: true };
@@ -363,6 +365,45 @@ document.addEventListener('keydown', (e) => {
     if (mode === 'parkimine') {
         if (e.key === 'q') parkingSim.car.angle -= 0.05;
         if (e.key === 'e') parkingSim.car.angle += 0.05;
+    }
+    // Keyboard accessibility shortcuts (works across all non-text-input contexts)
+    if (e.target.tagName === 'INPUT') return;
+    if (e.key === 'n' || e.key === 'N') {
+        // Next question / skip
+        if (mode === 'kiirus' || mode === 'quiz') { showQuiz(); }
+        else if (mode === 'ylesanded') { showTextTask(); }
+        else if (mode === 'parkla') { initParkingLot(); drawParkingLot(); }
+        else if (mode === 'reaktsioon') { startReactionTest(); }
+        else if (mode === 'parkimine') { initParkingSim(); }
+    }
+    if (e.key === 'h' || e.key === 'H') {
+        // Show hint
+        const hintEl = document.getElementById('hint-text');
+        if (mode === 'quiz' || mode === 'kiirus') {
+            const quizHint = document.getElementById('quiz-hint');
+            if (quizHint) quizHint.textContent = quiz ? '💡 Vihje: ' + quiz.hint : 'Vihje pole saadaval';
+            else if (hintEl) hintEl.textContent = '💡 Vihje: Klõpsa fooril, et vahetada. Jälgi liiklust!';
+        }
+        if (currentTextTask) {
+            const calcBox = document.getElementById('calc-box');
+            if (calcBox) { calcBox.style.display = 'block'; calcBox.textContent = '💡 Vihje: ' + currentTextTask.hint + ' | ' + currentTextTask.calc; }
+        }
+        if (mode === 'parkla') {
+            const pH = document.getElementById('parking-hint');
+            if (pH) pH.textContent = '💡 Vihje: Vali tähistatud ⭐ koht — see on ainus vaba koht, mis on märgitud!';
+        }
+        if (mode === 'reaktsioon') {
+            if (hintEl) hintEl.textContent = '💡 Vihje: Klõpsa kohe, kui foor muutub roheliseks. Reageerimiseks sul on 5 sekundit.';
+        }
+        if (mode === 'parkimine') {
+            if (hintEl) hintEl.textContent = '💡 Vihje: Kasuta ↑ ette, ▼ tagasi, ← → pööramiseks. Q/E keelega pööra. Parki rohelisse kasti!';
+        }
+        if (mode === 'prioriteet') {
+            if (hintEl) hintEl.textContent = '💡 Vihje: Klõpsa fooril, et kiirabile/bussile roheline anda. Ära uneta teisi sõidukeid!';
+        }
+        if (mode === 'foor') {
+            if (hintEl) hintEl.textContent = '💡 Vihje: Klõpsa punasel fooril, et see roheliseks muuta. Kiirabi ja bussid eiravad punast!';
+        }
     }
 });
 document.addEventListener('keyup', (e) => { keys[e.key] = false; });
