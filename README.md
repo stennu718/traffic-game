@@ -17,5 +17,23 @@ Just open [index.html](https://stennu718.github.io/traffic-game/) in your browse
 ## Screenshot
 ![Gameplay](docs/screenshot.png)
 
+## Technical Highlights
+
+- **Zero dependencies**: Single HTML file, no build step, no npm
+- **Offline-first**: Service worker caches everything — works without internet
+- **Accessibility**: Keyboard navigation, ARIA labels, high contrast mode, reduced motion support
+- **Responsive**: Works on mobile, tablet, and desktop
+- **Testing**: 33 unit tests for game logic (node:test)
+- **PWA**: Installable as app on mobile devices
+
+## Architecture
+
+```
+index.html        # Complete game (HTML + CSS + JS)
+sw.js             # Service worker for offline caching
+manifest.json     # PWA manifest
+tests/            # Unit tests for game logic
+```
+
 ## License
 MIT
